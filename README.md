@@ -1,6 +1,6 @@
 # 박스오피스🎬
 ## 소개
-> 영화진흥위원회의 API를 통해 박스오피스, 영화 상세정보를 불러오는 앱입니다.
+> 영화진흥위원회와 Daum 검색 API를 통해 박스오피스, 영화 상세정보를 불러오는 앱입니다.
 
 **프로젝트 기간 : 23/07/24~**
 </br>
@@ -33,7 +33,11 @@
 |2023.07.31.| 프로젝트 진행을 위한 개인 공부시간 |
 |2023.08.01.| 프로젝트 진행을 위한 개인 공부시간 |
 |2023.08.02.| CollectionView세팅, BoxOfficeRankingCell 생성 및 셀 구성 세팅,  DiffableDataSource 세팅 및 연결, 랭킹 증감분 AttributedString 처리, collectionView에 refreshControl 추가 |
-|2023.08.04.| 리뷰에 따른 리팩토링 진행  |
+|2023.08.07.| 리뷰에 따른 리팩토링 진행  |
+|2023.08.08.|DaumImageEntity 파일 추가 및 DAUM_API_KEY 추가, MovieDetailViewController 파일 추가 및 view 전환 메서드 추가, MoviewDetailViewController에 MoviewDetail 네트워크 연결 |
+|2023.08.09.|프로젝트 진행을 위한 개인 공부시간|
+|2023.08.10.|스택뷰의 text설정메서드 기능 분리 및 Namespace 생성, MovieDetailView 로딩화면 수정 |
+|2023.08.11.|README 작성|
 
 <a id="3."></a></br>
 ## 시각화 구조
@@ -44,22 +48,25 @@
     │   │   └── String+.swift
     │   ├── Model
     │   │   ├── BoxOfficeEntity.swift
+    │   │   ├── MovieDetailEntity.swift
+    │   │   ├── DaumImageEntity.swift
     │   │   ├── DecodingManager.swift
     │   │   ├── Error.swift
-    │   │   ├── MovieDetailEntity.swift
     │   │   ├── NetworkingManager.swift
     │   │   └── URLSessionProtocol.swift
     │   ├──View
-    │   │   └── BoxOfficeRankingCell.swift
+    │   │   ├── BoxOfficeRankingCell.swift
+    │   │   └── MovieDetailStackView.swift
     │   ├── Controller
-    │   │   └── BoxOfficeViewController.swift
+    │   │   ├── BoxOfficeViewController.swift
+    │   │   └── MovieDetailViewController.swift
     │   ├── Resource
     │   │   ├── AppDelegate.swift
     │   │   ├── SceneDelegate.swift
     │   │   ├── NetworkNamespace.swift
     │   │   ├── Assets.xcassets
     │   │   └── box_office_sample.json
-    │   └──  Info.plist
+    │   └──Info.plist
     ├── BoxOffice.xcodeproj
     ├── BoxOfficeTests
     │   ├── BoxOffice.xctestplan
@@ -69,29 +76,161 @@
     └── README.md
 
 ### UML
-<img src="https://hackmd.io/_uploads/B1tZIkFo3.png"><br>
+#### 박스오피스 화면
+<img src="https://hackmd.io/_uploads/rkGScZm33.png"><br>
 
+#### 영화 상세정보 화면
+<img src="https://hackmd.io/_uploads/HkU8q-7hh.png">
+<br>
 
 <a id="4."></a></br>
 ## 핵심경험
 #### 🌟 CodingKeys와 Nested Type Enum을 활용한 중첩 json 파싱
 `Nested Type`을 활용하여 여러 단계로 중첩된 형태의 json을 파싱할 수 있도록 하였고, `CodingKeys`를 활용해 이해하기 어려운 파라미터명을 변경하였습니다.
+<details>
+<summary>상세코드</summary>
+<div markdown="1">
+
+```swift
+extension BoxOfficeEntity {
+    struct BoxOfficeResult: Decodable {
+        let boxOfficeType, showRange: String
+        let dailyBoxOfficeList: [DailyBoxOffice]
+
+        enum CodingKeys: String, CodingKey {
+            case boxOfficeType = "boxofficeType"
+            case showRange, dailyBoxOfficeList
+        }
+    }
+}
+```
+</div>
+</details>
+
+
 #### 🌟 Generic을 활용한 범용 메서드 구현
 다양한 타입의 Entity를 반환해야 하는 `DecodingManager`의 메서드를 `Generic`으로 구현하였습니다.
+<details>
+<summary>상세코드</summary>
+<div markdown="1">
+    
+```swift
+func decode<T: Decodable>(_ data: Data?) throws -> T {
+    guard let data = data,
+          let decodedData = try? decoder.decode(T.self, from: data) else {
+        throw DecodingError.decodingFailure
+    }
+    return decodedData
+}
+```
+    
+</div>
+</details>
+
 #### 🌟 xcconfig, info.plist를 활용한 api key 설정
 환경 파일을 활용해 원격 저장소에 공유되지 않아야 하는 key 정보를 관리하였습니다.
+
 #### 🌟 UIActivityIndicatorView를 활용한 로딩 구현
 데이터 fetch 상태에 따라 `UIActivityIndicatorView`의 상태값을 변경하여 로딩 마크가 활성화/비활성화 되도록 구현하였습니다.
+<details>
+<summary>상세코드</summary>
+<div markdown="1">
+    
+```swift
+private let indicatorView: UIActivityIndicatorView = {
+    let indicatorView = UIActivityIndicatorView()
+    indicatorView.style = .large
+    indicatorView.translatesAutoresizingMaskIntoConstraints = false
+
+    return indicatorView
+}()
+
+private var isLoading: Bool = true {
+    willSet(newValue) {
+        if newValue == true {
+            indicatorView.isHidden = false
+            indicatorView.startAnimating()
+        } else {
+            indicatorView.isHidden = true
+            indicatorView.stopAnimating()
+        }
+    }
+}
+```
+    
+</div>
+</details>
+
 #### 🌟 UIRefreshControl를 활용한 새로고침 구현
 `Collection View`에 `UIRefreshColtrol` 객체를 추가하여, 아래로 당겼을 때 새로고침을 진행할 수 있도록 하였습니다.
+<details>
+<summary>상세코드</summary>
+<div markdown="1">
+    
+```swift
+collectionView.refreshControl = refreshControl
+    refreshControl.addTarget(self, action: #selector(refresh), for: .valueChanged)
+```
+    
+</div>
+</details>
+
 #### 🌟 Modern Collection View 구현
 `Modern Collection View`를 통해 박스오피스 랭킹 리스트를 구현하기 위하여 `Diffable Data Source`와 `Collection View List Cell`를 활용하였습니다.
+<details>
+<summary>상세코드</summary>
+<div markdown="1">
+    
+```swift
+private let collectionView: UICollectionView = {
+    let configuration = UICollectionLayoutListConfiguration(appearance: .plain)
+    let layout = UICollectionViewCompositionalLayout.list(using: configuration)
+...
+}
+    
+private var dataSource: UICollectionViewDiffableDataSource<NetworkNamespace, BoxOfficeEntity.BoxOfficeResult.DailyBoxOffice>?
+...
+    
+```
+    
+</div>
+</details>
+
 #### 🌟 Attributed String 활용
 하나의 레이블 안에서 여러 가지 색상을 표시하기 위하여 `Attributed String`을 활용하였습니다.
+<details>
+<summary>상세코드</summary>
+<div markdown="1">
+    
+```swift
+attributedString.addAttribute(.foregroundColor, value: UIColor.systemRed, range: (fixedIntensity as NSString).range(of: "▲"))
+```
+    
+</div>
+</details>
 
 <a id="5."></a></br>
 ## 트러블슈팅
-### 1️⃣ dataTask 메서드로 받아온 데이터 처리
+### 1️⃣ 네트워크 연결시 URL 전달 방식
+**🚨 문제점**</br>
+기존에는 `dataTask` 메서드에 `URL` 타입을 전달하여 네트워크 연결을 진행하도록 구현했었습니다. 하지만 이번에 `Daum API`가 추가되면서 `Authorization` 헤더를 추가해야 했기 때문에 해당 정보를 어떻게 전달할지 고민하였습니다.
+
+**💡 해결 방법**</br>
+`URLRequest`를 활용하면 `setValue`를 통해 헤더 정보를 추가할 수 있음을 확인하였습니다. 이에 따라 기존 테스트더블 및 테스트코드 모두 `URLRequest`에 맞게 수정을 진행하였습니다.
+
+```swift
+var request = URLRequest(url: url)
+request.setValue("KakaoAK \(NetworkNamespace.daumApiKey)", forHTTPHeaderField: "Authorization")
+```
+
+또한 `Daum API`에 전달할 쿼리 내용에는 띄어쓰기가 추가되어 있어, `URL`에 붙여서 보내기보다는 `URLComponents`를 사용해 필요한 쿼리 아이템을 추가하는 게 좋겠다는 생각이 들었습니다.
+해당 내용은 아래와 같이 구현하였습니다.
+```swift
+var urlComponents = URLComponents(string: NetworkNamespace.daumImage.url)
+urlComponents?.queryItems = [URLQueryItem(name: "query", value: "\(movieName) 영화 포스터")]
+```
+
+### 2️⃣ dataTask 메서드로 받아온 데이터 처리
 **🚨 문제점**</br>
 `NetworkingManager`의 `load()` 메서드를 호출한 위치에서 `dataTask`를 통해 받아 온 데이터를 활용할 수 있는 방법에 대해 고민이 있었습니다.
 처음에는 두 타입을 델리게이트로 연결하여 전달하는 등의 방법을 생각했습니다. 하지만 데이터 처리를 위해 네트워킹을 사용하는 모든 타입을 델리게이트로 연결하는 것은 권장되는 방식도 아니고, 효율적이지 못한 것 같았습니다.
@@ -112,7 +251,7 @@ func load(_ urlString: String, completion: @escaping (Result<Data, BoxOfficeErro
         ...
 ```
 
-### 2️⃣ ATS를 통한 네트워크 설정
+### 3️⃣ ATS를 통한 네트워크 설정
 **🚨 문제점**</br>
 API를 받아와야 하는 도메인이 `https`가 아닌 `http`를 활용하고 있어 네트워크 연결시에 오류가 발생하였습니다.</br>
 <img src="https://hackmd.io/_uploads/BkwWly-jn.png"></br>
@@ -121,7 +260,7 @@ API를 받아와야 하는 도메인이 `https`가 아닌 `http`를 활용하고
 해당 도메인 및 하위 도메인 정보를 ATS에 `Exception Domains`로 추가하여 정상적으로 네트워킹이 가능하도록 구현하였습니다.</br>
 <img src="https://hackmd.io/_uploads/Hkj4Tsgjh.png"></br>
 
-### 3️⃣ 로딩과 새로고침 종료 위치 설정
+### 4️⃣ 로딩과 새로고침 종료 위치 설정
 **🚨 문제점**</br>
 네트워킹을 통해 받아 온 데이터를 처리하는 과정에서 성공한 경우에만 로딩을 끝내고 빠져나갈 수 있도록 처리하였더니, 에러가 났을 때는 아래와 같이 계속 로딩이 돌아가고 있는 것처럼 보이는 것을 확인했습니다.</br>
 <img src="https://hackmd.io/_uploads/HkMVV0Yon.png" width="200"></br>
@@ -151,34 +290,7 @@ DispatchQueue.main.async {
 }
 ```
 
-### 4️⃣ Cell Accessory 설정
-**🚨 문제점**</br>
-아래와 같이 코드를 작성하여 각 셀 우측에 악세서리를 추가하였습니다. 하지만 이렇게 하니 `>` 아이콘이 파란색으로 표시되는 것을 확인하였습니다.
-```swift
-cell.accessories = [.outlineDisclosure()]
-```
-<img src="https://hackmd.io/_uploads/BJyxnyYoh.png"></br>
-
-**💡 해결 방법**</br>
-`tintColor` 설정을 추가하여 회색으로 표시될 수 있도록 변경하였습니다.
-```swift
-cell.accessories = [.outlineDisclosure(options: .init(tintColor: .systemGray))]
-```
-<img src="https://hackmd.io/_uploads/r19MhyYj3.png"></br>
-
-### 5️⃣ Cell Separator 설정
-**🚨 문제점**</br>
-`UICollectionLayoutListConfiguration`의 기본 설정으로 `Collection View`를 구성하니 각 셀 사이의 구분자인 `separator`가 화면 끝까지 이어지지 않는 문제가 있었습니다.</br>
-<img src="https://hackmd.io/_uploads/B1ysLAFj2.png"></br>
-
-**💡 해결 방법**</br>
-레이아웃 설정에서 아래의 내용을 추가하여 해결하였습니다.
-```swift
-self.separatorLayoutGuide.leadingAnchor.constraint(equalTo: rankLabel.leadingAnchor)
-```
-<img src="https://hackmd.io/_uploads/SySyvCYo2.png"></br>
-
-### 6️⃣ Test Double 생성
+### 5️⃣ Test Double 생성
 **🚨 문제점**</br>
 인터넷 연결이 없는 상태에서 네트워크 통신을 테스트하기 위해 `Test Double`을 생성하였습니다. 이 과정에서 테스트용 `Stub Session`과 실제 `Session` 사이에 호환이 가능하도록 하기 위해 `URLSessionProtocol`을 구현하였는데, `URLSession`에서 이를 상속하려 하니 아래와 같은 경고가 발생하였습니다.</br>
 <img src="https://hackmd.io/_uploads/BJeZG3lin.png" width="1000"></br>
@@ -190,6 +302,40 @@ typealias CompletionHandler = @Sendable (Data?, URLResponse?, Error?) -> Void
 ```
 
 
+### 6️⃣ 다양한 네트워크에 대한 Test 환경 구성 
+**🚨 문제점**</br>
+세 가지 다른 API를 호출하는 프로그램이다 보니, 각 API 내용에 따라 매번 새로운 테스트 환경을 만들어주어야 해서 번거로웠습니다.
+
+**💡 해결 방법**</br>
+아래와 같이 테스트 타입을 파라미터로 전달받아 각 타입에 맞는 테스트환경을 구성할 수 있도록 구현하였습니다. 
+```swift
+func setUpSUT(isSuccess: Bool, apiType: NetworkNamespace) {
+    ...
+        switch apiType {
+    case .boxOffice:
+        urlString = String(format: NetworkNamespace.boxOffice.url, NetworkNamespace.apiKey, "20230801")
+        asset = "box_office_sample"
+    case .movieDetail:
+        urlString = String(format: NetworkNamespace.movieDetail.url, NetworkNamespace.apiKey, "20230801")
+        asset = "movie_detail_sample"
+    case .daumImage:
+        urlString = String(format: NetworkNamespace.daumImage.url)
+        asset = "daum_image_sample"
+    }
+
+    ...
+
+    if isSuccess {
+        ...
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+        ...
+    } else {
+        let response = HTTPURLResponse(url: url, statusCode: 400, httpVersion: nil, headerFields: nil)
+        ...
+    }
+}
+```
+
 <a id="6."></a></br>
 ## 참고자료
 - [URLSession 공식문서🍎](https://developer.apple.com/documentation/foundation/urlsession)
@@ -197,6 +343,11 @@ typealias CompletionHandler = @Sendable (Data?, URLResponse?, Error?) -> Void
 - [UICollectionView 공식문서🍎](https://developer.apple.com/documentation/uikit/uicollectionview)
 - [UICollectionViewListCell 공식문서🍎](https://developer.apple.com/documentation/uikit/uicollectionviewlistcell)
 - [UICollectionViewDiffableDataSource 공식문서🍎](https://developer.apple.com/documentation/uikit/uicollectionviewdiffabledatasource)
+- [URLRequest 공식문서🍎](https://developer.apple.com/documentation/foundation/urlrequest)
+- [URLComponents 공식문서🍎](https://developer.apple.com/documentation/foundation/urlcomponents)
+- [AttributedString 공식문서🍎](https://developer.apple.com/documentation/foundation/attributedstring)
+- [UIRefreshControl 공식문서🍎](https://developer.apple.com/documentation/uikit/uirefreshcontrol)
+- [UIActivityIndicatorView 공식문서🍎](https://developer.apple.com/documentation/uikit/uiactivityindicatorview)
 - [야곰 닷넷 - Unit Test](https://yagom.net/courses/unit-test-%ec%9e%91%ec%84%b1%ed%95%98%ea%b8%b0/)
 </br>
 
